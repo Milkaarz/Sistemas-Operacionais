@@ -23,7 +23,6 @@ function getLocalIP() {
   return '127.0.0.1';
 }
 
-// Rota de API JSON para atualização em tempo real
 app.get('/api/stats', (req, res) => {
   const totalMem = Math.round(os.totalmem() / 1024 / 1024);
   const freeMem = Math.round(os.freemem() / 1024 / 1024);
@@ -56,7 +55,7 @@ app.get('/', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>MeowNitor Ultra 🐾</title>
+      <title>MeowNitor Divertido 🐾</title>
       <style>
         * {
           box-sizing: border-box;
@@ -75,6 +74,8 @@ app.get('/', (req, res) => {
           align-items: center;
           min-height: 100vh;
           padding: 24px;
+          position: relative;
+          overflow-x: hidden;
         }
 
         .container {
@@ -86,6 +87,7 @@ app.get('/', (req, res) => {
           box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
           border: 2px solid #332826;
           position: relative;
+          z-index: 10;
         }
 
         .container::before, .container::after {
@@ -102,7 +104,7 @@ app.get('/', (req, res) => {
         .container::after { right: 40px; }
 
         header {
-          margin-bottom: 24px;
+          margin-bottom: 20px;
           border-bottom: 2px dashed #3a2e2b;
           padding-bottom: 18px;
           display: flex;
@@ -136,17 +138,44 @@ app.get('/', (req, res) => {
           50% { opacity: 0.3; }
         }
 
-        header .status-badge {
-          background-color: rgba(255, 191, 179, 0.12);
+        /* Zona Interativa de Botões */
+        .interactive-bar {
+          display: flex;
+          gap: 12px;
+          margin-bottom: 24px;
+          flex-wrap: wrap;
+        }
+
+        .btn-cat {
+          background-color: #2a2321;
           color: #FFBFB3;
           border: 1.5px solid #FFBFB3;
-          padding: 8px 18px;
+          padding: 10px 18px;
           border-radius: 999px;
           font-size: 0.9rem;
           font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s ease;
           display: flex;
           align-items: center;
           gap: 8px;
+        }
+
+        .btn-cat:hover {
+          background-color: #FFBFB3;
+          color: #181414;
+          transform: scale(1.05);
+        }
+
+        /* Caixa de Curiosidade Felina */
+        .fact-box {
+          background: #2a2321;
+          border-left: 4px solid #FFBFB3;
+          padding: 14px 18px;
+          border-radius: 12px;
+          margin-bottom: 20px;
+          font-size: 0.95rem;
+          color: #ffdcd5;
         }
 
         .section-title {
@@ -221,6 +250,20 @@ app.get('/', (req, res) => {
           transition: width 0.5s ease-in-out;
         }
 
+        /* Efeito de Patinha ao clicar */
+        .paw-print {
+          position: absolute;
+          font-size: 24px;
+          pointer-events: none;
+          animation: fadePaw 1s forwards;
+          z-index: 999;
+        }
+
+        @keyframes fadePaw {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.5); }
+        }
+
         footer {
           margin-top: 30px;
           text-align: center;
@@ -230,117 +273,176 @@ app.get('/', (req, res) => {
       </style>
     </head>
     <body>
-      <div class="container">
+      <div class="container" id="mainContainer">
         <header>
-          <h1>🐱 MeowNitor Ultra</h1>
-          <span class="status-badge"><span class="live-dot"></span> Ao Vivo (Auto 3s)</span>
+          <h1>🐱 MeowNitor Divertido</h1>
+          <span style="color: #FFBFB3; font-weight: 700; font-size: 0.9rem;">
+            <span class="live-dot"></span> Monitorando Toca
+          </span>
         </header>
 
-        <div class="section-title">⚡ Desempenho e Memória</div>
-        <div class="grid">
-          <div class="card full-width">
-            <span class="label">🥣 Consumo de Memória RAM</span>
-            <span class="value highlight" id="ramText">${usedMem} MB / ${totalMem} MB (${memUsagePercent}%)</span>
-            <div class="progress-bar">
-              <div class="progress-fill" id="ramBar" style="width: ${memUsagePercent}%;"></div>
+        <!-- Barra de Botões Divertidos -->
+        <div class="interactive-bar">
+          <button class="btn-cat" onclick="playMeow()">🔊 Pedir Miau!</button>
+          <button class="btn-cat" onclick="newFact()">💡 Fato Felino Surpresa</button>
+          <button class="btn-cat" onclick="toggleNap()">💤 Tirar Sesta</button>
+        </div>
+
+        <!-- Curiosidade Felina -->
+        <div class="fact-box" id="factBox">
+          🐾 <strong>Fato Felino:</strong> Gatos passam cerca de 70% da vida dormindo!
+        </div>
+
+        <div id="monitorContent">
+          <div class="section-title">🥣 Apetite e Ronronar do Sistema</div>
+          <div class="grid">
+            <div class="card full-width">
+              <span class="label">🐟 Pote de Ração (Memória RAM Geral)</span>
+              <span class="value highlight" id="ramText">${usedMem} MB / ${totalMem} MB (${memUsagePercent}%)</span>
+              <div class="progress-bar">
+                <div class="progress-fill" id="ramBar" style="width: ${memUsagePercent}%;"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <span class="label">Petisco Atual (RAM Node)</span>
+              <span class="value highlight" id="processMem">${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB</span>
+            </div>
+
+            <div class="card">
+              <span class="label">Nível de Agitação (Estresse CPU)</span>
+              <span class="value highlight" id="loadAvg">${os.loadavg()[0].toFixed(2)}</span>
+            </div>
+
+            <div class="card">
+              <span class="label">Tempo Sem Tirar Sesta</span>
+              <span class="value" id="uptime">${formatUptime(os.uptime())}</span>
+            </div>
+
+            <div class="card">
+              <span class="label">Acordou da Última Sesta</span>
+              <span class="value" style="font-size: 0.9rem;">${bootTime}</span>
             </div>
           </div>
 
-          <div class="card">
-            <span class="label">📊 Uso da Aplicação (Process Heap)</span>
-            <span class="value highlight" id="processMem">${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB</span>
+          <div class="section-title">🧠 Cérebro e Músculos Felinos</div>
+          <div class="grid">
+            <div class="card full-width">
+              <span class="label">Modelo do Cérebro (CPU)</span>
+              <span class="value">${cpus[0] ? cpus[0].model : 'Gato Misterioso'}</span>
+            </div>
+
+            <div class="card">
+              <span class="label">Garras e Patas (Núcleos)</span>
+              <span class="value">${cpus.length} Patinhas Ativas</span>
+            </div>
+
+            <div class="card">
+              <span class="label">Velocidade dos Corredores</span>
+              <span class="value">${cpus[0] ? cpus[0].speed : 'N/A'} MHz</span>
+            </div>
+
+            <div class="card">
+              <span class="label">Anatomia (Arquitetura)</span>
+              <span class="value">${os.arch()}</span>
+            </div>
           </div>
 
-          <div class="card">
-            <span class="label">⚡ Carga Média CPU (1m)</span>
-            <span class="value highlight" id="loadAvg">${os.loadavg()[0].toFixed(2)}</span>
-          </div>
+          <div class="section-title">🏠 Território e Registro do Felino</div>
+          <div class="grid">
+            <div class="card">
+              <span class="label">Nome da Toca (Hostname)</span>
+              <span class="value highlight">${os.hostname()}</span>
+            </div>
 
-          <div class="card">
-            <span class="label">⏰ Uptime do Sistema</span>
-            <span class="value" id="uptime">${formatUptime(os.uptime())}</span>
-          </div>
+            <div class="card">
+              <span class="label">Endereço Secreto (IP Local)</span>
+              <span class="value">${getLocalIP()}</span>
+            </div>
 
-          <div class="card">
-            <span class="label">🚀 LIGADO DESDE</span>
-            <span class="value" style="font-size: 0.9rem;">${bootTime}</span>
-          </div>
-        </div>
+            <div class="card">
+              <span class="label">Humano de Estimação</span>
+              <span class="value">${os.userInfo().username}</span>
+            </div>
 
-        <div class="section-title">🧠 Especificações do Hardware</div>
-        <div class="grid">
-          <div class="card full-width">
-            <span class="label">🐟 Modelo da CPU</span>
-            <span class="value">${cpus[0] ? cpus[0].model : 'N/A'}</span>
-          </div>
-
-          <div class="card">
-            <span class="label">🐾 Núcleos / Threads</span>
-            <span class="value">${cpus.length} Núcleos</span>
-          </div>
-
-          <div class="card">
-            <span class="label">💨 Frequência Base</span>
-            <span class="value">${cpus[0] ? cpus[0].speed : 'N/A'} MHz</span>
-          </div>
-
-          <div class="card">
-            <span class="label">⚙️ Arquitetura</span>
-            <span class="value">${os.arch()}</span>
-          </div>
-
-          <div class="card">
-            <span class="label">Endianness</span>
-            <span class="value">${os.endianness()}</span>
-          </div>
-        </div>
-
-        <div class="section-title">🌐 Sistema e Rede</div>
-        <div class="grid">
-          <div class="card">
-            <span class="label">🏠 Hostname</span>
-            <span class="value highlight">${os.hostname()}</span>
-          </div>
-
-          <div class="card">
-            <span class="label">🌐 IP Local (IPv4)</span>
-            <span class="value">${getLocalIP()}</span>
-          </div>
-
-          <div class="card">
-            <span class="label">👤 Usuário</span>
-            <span class="value">${os.userInfo().username}</span>
-          </div>
-
-          <div class="card">
-            <span class="label">💻 Sistema Operacional</span>
-            <span class="value">${os.platform()} (${os.type()})</span>
-          </div>
-
-          <div class="card">
-            <span class="label">🐧 Versão Kernel</span>
-            <span class="value" style="font-size: 0.95rem;">${os.release()}</span>
-          </div>
-
-          <div class="card">
-            <span class="label">🟢 Node.js</span>
-            <span class="value highlight">${process.version}</span>
-          </div>
-
-          <div class="card">
-            <span class="label">🆔 Process ID (PID)</span>
-            <span class="value">${process.pid}</span>
+            <div class="card">
+              <span class="label">Raça do Sistema (OS)</span>
+              <span class="value">${os.platform()} (${os.type()})</span>
+            </div>
           </div>
         </div>
 
         <footer>
-          <p>Feito com 🐾 | Atualizando em tempo real a cada 3 segundos</p>
+          <p>Feito com 🐾 | Clique na tela para deixar pegadas!</p>
         </footer>
       </div>
 
       <script>
-        // Script client-side para recarregar informações sem F5
+        // 1. Áudio de Miau via Web Audio API (sem arquivos de áudio)
+        function playMeow() {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = 'sine';
+          const pitch = 500 + Math.random() * 200;
+          osc.frequency.setValueAtTime(pitch, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(pitch * 1.5, ctx.currentTime + 0.15);
+          osc.frequency.exponentialRampToValueAtTime(pitch * 0.8, ctx.currentTime + 0.4);
+
+          gain.gain.setValueAtTime(0, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start();
+          osc.stop(ctx.currentTime + 0.4);
+        }
+
+        // 2. Curiosidades Felinas
+        const catFacts = [
+          "Gatos passam cerca de 70% da vida dormindo!",
+          "O miado foi desenvolvido quase exclusivamente para se comunicar com humanos.",
+          "Um gato pode pular até 6 vezes a sua própria altura!",
+          "O nariz de cada gato tem uma pegada única, assim como a digital humana.",
+          "Gatos têm 32 músculos em cada orelha para ouvir tudo em 360 graus."
+        ];
+
+        function newFact() {
+          const randomFact = catFacts[Math.floor(Math.random() * catFacts.length)];
+          document.getElementById('factBox').innerHTML = '🐾 <strong>Fato Felino:</strong> ' + randomFact;
+        }
+
+        // 3. Efeito de Sesta (Oculta o Monitor)
+        let napping = false;
+        function toggleNap() {
+          const content = document.getElementById('monitorContent');
+          napping = !napping;
+          if (napping) {
+            content.style.display = 'none';
+            document.getElementById('factBox').innerHTML = '💤 <strong>O gato está dormindo...</strong> Clique em "Tirar Sesta" novamente para acordá-lo!';
+          } else {
+            content.style.display = 'block';
+            newFact();
+          }
+        }
+
+        // 4. Efeito Visual de Pegada ao Clicar
+        document.addEventListener('click', (e) => {
+          const paw = document.createElement('div');
+          paw.className = 'paw-print';
+          paw.innerText = '🐾';
+          paw.style.left = (e.pageX - 12) + 'px';
+          paw.style.top = (e.pageY - 12) + 'px';
+          document.body.appendChild(paw);
+          setTimeout(() => paw.remove(), 1000);
+        });
+
+        // Atualização em Tempo Real
         async function updateStats() {
+          if (napping) return;
           try {
             const res = await fetch('/api/stats');
             const data = await res.json();
@@ -351,7 +453,7 @@ app.get('/', (req, res) => {
             document.getElementById('loadAvg').innerText = data.loadAvg;
             document.getElementById('uptime').innerText = data.uptime;
           } catch (e) {
-            console.error('Erro ao atualizar dados:', e);
+            console.error(e);
           }
         }
 
@@ -363,4 +465,4 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT} 🐱`));
+app.listen(PORT, () => console.log(`Servidor felino divertido rodando na porta ${PORT} 🐱`));
