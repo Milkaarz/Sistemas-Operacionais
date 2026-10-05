@@ -1,5 +1,7 @@
 const express = require('express');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const CIRC = 2 * Math.PI * 54; // circunferência do anel (r = 54)
@@ -21,21 +23,67 @@ function getLocalIP() {
   return '127.0.0.1';
 }
 
+// Uso de cada "pata" (núcleo) desde a última leitura
+let prevCpu = os.cpus().map((c) => ({ ...c.times }));
+let lastUsage = null;
+let lastRead = 0;
+function getCoreUsage() {
+  // Leituras muito próximas dão porcentagens instáveis: reaproveita a última
+  if (lastUsage && Date.now() - lastRead < 1000) return lastUsage;
+  const cur = os.cpus();
+  const usage = cur.map((c, i) => {
+    const p = prevCpu[i] || { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 };
+    const idle = c.times.idle - p.idle;
+    const total = Object.keys(c.times).reduce((a, k) => a + c.times[k] - (p[k] || 0), 0);
+    return total > 0 ? Math.round((1 - idle / total) * 100) : 0;
+  });
+  prevCpu = cur.map((c) => ({ ...c.times }));
+  lastUsage = usage;
+  lastRead = Date.now();
+  return usage;
+}
+
+// "Caixa de areia" (disco)
+function getDisk() {
+  try {
+    const st = fs.statfsSync(path.parse(process.cwd()).root);
+    const total = st.blocks * st.bsize;
+    const used = total - st.bavail * st.bsize;
+    return {
+      totalGB: (total / 1e9).toFixed(1),
+      usedGB: (used / 1e9).toFixed(1),
+      percent: Math.round((used / total) * 100)
+    };
+  } catch (e) {
+    return null; // statfsSync exige Node 18.15+
+  }
+}
+
 function getStats() {
   const totalMem = Math.round(os.totalmem() / 1024 / 1024);
   const freeMem = Math.round(os.freemem() / 1024 / 1024);
   const usedMem = totalMem - freeMem;
-  const cores = os.cpus().length || 1;
-  const load = os.loadavg()[0];
+  const cores = getCoreUsage();
+  const [l1, l5, l15] = os.loadavg();
+  const now = new Date();
   return {
     uptime: formatUptime(os.uptime()),
-    loadAvg: load.toFixed(2),
-    loadPercent: Math.min(100, Math.round((load / cores) * 100)),
+    processUptime: formatUptime(process.uptime()),
+    loadAvg: l1.toFixed(2),
+    load1: l1.toFixed(2),
+    load5: l5.toFixed(2),
+    load15: l15.toFixed(2),
+    cores,
+    loadPercent: Math.round(cores.reduce((a, b) => a + b, 0) / (cores.length || 1)),
     usedMem,
     freeMem,
     totalMem,
     memUsagePercent: Math.round((usedMem / totalMem) * 100),
-    processMem: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)
+    processMem: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
+    rss: (process.memoryUsage().rss / 1024 / 1024).toFixed(1),
+    disk: getDisk(),
+    hour: now.getHours(),
+    serverTime: now.toLocaleString('pt-BR')
   };
 }
 
@@ -44,6 +92,9 @@ app.get('/api/stats', (req, res) => res.json(getStats()));
 app.get('/', (req, res) => {
   const cpus = os.cpus();
   const s = getStats();
+  const nets = Object.entries(os.networkInterfaces()).flatMap(([name, list]) =>
+    list.filter((i) => i.family === 'IPv4' || i.family === 4)
+        .map((i) => ({ name, address: i.address, mac: i.mac, internal: i.internal })));
   const offset = (p) => (CIRC * (1 - p / 100)).toFixed(1);
 
   res.send(`<!DOCTYPE html>
@@ -272,6 +323,20 @@ app.get('/', (req, res) => {
   .gauge p { color: var(--muted); font-size: 0.9rem; }
   .gauge .detail { color: var(--text); font-weight: 700; margin-top: 6px; }
 
+  /* Patas, rotina e rede */
+  .cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .core {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 16px; padding: 12px 14px;
+  }
+  .core .name { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+  .bar { height: 8px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--peach), var(--butter)); border-radius: 999px; transition: width 0.6s ease; }
+  .core-pct { font-weight: 700; font-size: 0.85rem; min-width: 3.2ch; text-align: right; }
+  .card .sub { font-size: 0.8rem; color: var(--muted); word-break: break-all; }
+  .card .mood-text { font-family: 'Fredoka', sans-serif; font-size: 1.3rem; color: var(--butter); }
+
   /* Novelo */
   .yarn-playground {
     background: var(--surface-2);
@@ -382,20 +447,80 @@ app.get('/', (req, res) => {
             </div>
             <div>
               <h3>Nível de agitação</h3>
-              <p>Carga da CPU</p>
-              <p class="detail">Média: <span id="loadAvg">${s.loadAvg}</span></p>
+              <p>Uso da CPU agora</p>
+              <p class="detail">Média de 1 min: <span id="loadAvg">${s.loadAvg}</span></p>
             </div>
           </div>
+
+          ${s.disk ? `<div class="gauge">
+            <div class="ring">
+              <svg viewBox="0 0 132 132" aria-hidden="true">
+                <circle class="track" cx="66" cy="66" r="54"/>
+                <circle class="fill" id="diskRing" cx="66" cy="66" r="54" style="stroke-dashoffset:${offset(s.disk.percent)}"/>
+              </svg>
+              <div class="center"><span class="num" id="diskPct">${s.disk.percent}%</span><span class="mood" id="diskMood">😺</span></div>
+            </div>
+            <div>
+              <h3>Caixa de areia</h3>
+              <p>Espaço em disco</p>
+              <p class="detail" id="diskText">${s.disk.usedGB} GB de ${s.disk.totalGB} GB</p>
+            </div>
+          </div>` : ''}
         </div>
 
         <div class="grid" style="margin-top:16px">
+          <div class="card">
+            <span class="label">Humor do gato agora</span>
+            <span class="mood-text" id="moodText">😺 Brincando</span>
+          </div>
           <div class="card">
             <span class="label">Petisco atual (RAM do Node)</span>
             <span class="value highlight" id="processMem">${s.processMem} MB</span>
           </div>
           <div class="card">
-            <span class="label">Tempo acordado</span>
+            <span class="label">Barriga cheia (RAM total do Node)</span>
+            <span class="value" id="rss">${s.rss} MB</span>
+          </div>
+          <div class="card">
+            <span class="label">Estoque de petiscos (RAM livre)</span>
+            <span class="value" id="freeMem">${s.freeMem} MB</span>
+          </div>
+          <div class="card">
+            <span class="label">Tempo acordado (servidor)</span>
             <span class="value" id="uptime">${s.uptime}</span>
+          </div>
+          <div class="card">
+            <span class="label">Idade do gatinho (app rodando há)</span>
+            <span class="value" id="procUptime">${s.processUptime}</span>
+          </div>
+        </div>
+
+        <div class="section-title">🐾 Patas em ação</div>
+        <div class="cores">
+          ${s.cores.map((u, i) => `<div class="core"><span class="name">Pata ${i + 1}</span><div class="bar"><div class="bar-fill" id="core${i}" style="width:${u}%"></div></div><span class="core-pct" id="corePct${i}">${u}%</span></div>`).join('')}
+        </div>
+
+        <div class="section-title">🕰️ Rotina do gato</div>
+        <div class="grid">
+          <div class="card">
+            <span class="label">Agitação agora</span>
+            <span class="value highlight" id="load1">${s.load1}</span>
+          </div>
+          <div class="card">
+            <span class="label">Agitação nos últimos 5 min</span>
+            <span class="value" id="load5">${s.load5}</span>
+          </div>
+          <div class="card">
+            <span class="label">Agitação nos últimos 15 min</span>
+            <span class="value" id="load15">${s.load15}</span>
+          </div>
+          <div class="card">
+            <span class="label">Hora na toca</span>
+            <span class="value" id="clock">${s.serverTime}</span>
+          </div>
+          <div class="card" style="grid-column: 1 / -1">
+            <span class="label">O que o gato costuma fazer agora</span>
+            <span class="value highlight" id="routine"></span>
           </div>
         </div>
 
@@ -428,6 +553,35 @@ app.get('/', (req, res) => {
           <div class="card">
             <span class="label">Humano de estimação</span>
             <span class="value">${os.userInfo().username}</span>
+          </div>
+          <div class="card">
+            <span class="label">Cama favorita (pasta pessoal)</span>
+            <span class="value" style="font-size:0.95rem">${os.homedir()}</span>
+          </div>
+        </div>
+
+        <div class="section-title">🚪 Gatoeiras (placas de rede)</div>
+        <div class="grid">
+          ${nets.map((n) => `<div class="card"><span class="label">${n.name}${n.internal ? ' · só dentro de casa' : ' · porta para a rua'}</span><span class="value">${n.address}</span><span class="sub">MAC ${n.mac}</span></div>`).join('')}
+        </div>
+
+        <div class="section-title">🏷️ Carteirinha do gato</div>
+        <div class="grid">
+          <div class="card">
+            <span class="label">Raça (sistema operacional)</span>
+            <span class="value">${os.type()} ${os.release()}</span>
+          </div>
+          <div class="card">
+            <span class="label">Pelagem (arquitetura)</span>
+            <span class="value">${os.arch()}</span>
+          </div>
+          <div class="card">
+            <span class="label">Dialeto (versão do Node)</span>
+            <span class="value">${process.version}</span>
+          </div>
+          <div class="card">
+            <span class="label">Coleira (PID do app)</span>
+            <span class="value">${process.pid}</span>
           </div>
         </div>
       </div>
@@ -605,6 +759,37 @@ app.get('/', (req, res) => {
   setRing('ramRing', 'ramPct', 'ramMood', ${s.memUsagePercent}, ['😺', '😼', '🙀']);
   setRing('cpuRing', 'cpuPct', 'cpuMood', ${s.loadPercent}, ['😸', '😾', '🙀']);
 
+  // Dados extras: patas, rotina, disco, humor
+  const INITIAL = ${JSON.stringify(s)};
+  const byId = (id) => document.getElementById(id);
+  function routine(h) {
+    if (h >= 5 && h < 11) return '🐟 Pedir o café da manhã e miar na cara do humano';
+    if (h >= 11 && h < 18) return '😴 Cochilar em um raio de sol';
+    if (h >= 18 && h < 23) return '🔦 Caçar o ponto de laser pela casa';
+    return '🌙 Corrida maluca pela casa às 3 da manhã';
+  }
+  function applyExtra(d) {
+    d.cores.forEach((u, i) => {
+      const bar = byId('core' + i);
+      if (bar) { bar.style.width = u + '%'; byId('corePct' + i).innerText = u + '%'; }
+    });
+    byId('load1').innerText = d.load1;
+    byId('load5').innerText = d.load5;
+    byId('load15').innerText = d.load15;
+    byId('procUptime').innerText = d.processUptime;
+    byId('rss').innerText = d.rss + ' MB';
+    byId('freeMem').innerText = d.freeMem + ' MB';
+    byId('clock').innerText = d.serverTime;
+    byId('routine').innerText = routine(d.hour);
+    const peak = Math.max(d.memUsagePercent, d.loadPercent);
+    byId('moodText').innerText = peak >= 85 ? '🙀 Miando alto, socorro!' : peak >= 70 ? '😼 Caçando sem parar' : peak >= 40 ? '😺 Brincando animado' : '😴 Cochilando no sol';
+    if (d.disk && byId('diskRing')) {
+      setRing('diskRing', 'diskPct', 'diskMood', d.disk.percent, ['😺', '😼', '🙀']);
+      byId('diskText').innerText = d.disk.usedGB + ' GB de ' + d.disk.totalGB + ' GB';
+    }
+  }
+  applyExtra(INITIAL);
+
   // Atualização em tempo real
   async function updateStats() {
     if (inBox) return;
@@ -616,6 +801,7 @@ app.get('/', (req, res) => {
       document.getElementById('processMem').innerText = d.processMem + ' MB';
       document.getElementById('loadAvg').innerText = d.loadAvg;
       document.getElementById('uptime').innerText = d.uptime;
+      applyExtra(d);
     } catch (e) {
       console.error(e);
     }
