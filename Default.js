@@ -55,7 +55,7 @@ app.get('/', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>MeowNitor Supremo 🐾</title>
+      <title>MeowNitor Perfeito 🐾</title>
       <style>
         * {
           box-sizing: border-box;
@@ -78,13 +78,18 @@ app.get('/', (req, res) => {
           overflow-x: hidden;
         }
 
-        /* Patinha que segue o cursor */
-        #pawCursor {
-          position: fixed;
-          font-size: 22px;
+        /* Efeito de Patinha ao clicar */
+        .paw-print {
+          position: absolute;
+          font-size: 24px;
           pointer-events: none;
+          animation: fadePaw 1s forwards;
           z-index: 9999;
-          transition: transform 0.08s ease-out;
+        }
+
+        @keyframes fadePaw {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.5); }
         }
 
         .container {
@@ -389,11 +394,9 @@ app.get('/', (req, res) => {
       </style>
     </head>
     <body>
-      <div id="pawCursor">🐾</div>
-
       <div class="container" id="mainContainer">
         <header>
-          <h1>🐱 MeowNitor Supremo</h1>
+          <h1>🐱 MeowNitor Perfeito</h1>
           <span style="color: #FFBFB3; font-weight: 700; font-size: 0.9rem;">
             <span class="live-dot"></span> Toca Ativa
           </span>
@@ -441,7 +444,7 @@ app.get('/', (req, res) => {
 
               <div class="card">
                 <span class="label">Petisco Atual (RAM Node)</span>
-                <span class="value highlight" id="processMem">${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB</span>
+                <span class="value highlight" id="processMem">${(processMemoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB</span>
               </div>
 
               <div class="card">
@@ -506,15 +509,22 @@ app.get('/', (req, res) => {
         </div>
 
         <footer>
-          <p>Feito com 🐾 | Mova o mouse para passear com a patinha!</p>
+          <p>Feito com 🐾 | Clique em qualquer lugar para deixar uma pegada de gato!</p>
         </footer>
       </div>
 
       <script>
-        // 1. Patinha que segue o cursor do mouse
-        const paw = document.getElementById('pawCursor');
-        document.addEventListener('mousemove', (e) => {
-          paw.style.transform = \`translate(\${e.clientX + 12}px, \${e.clientY + 12}px)\`;
+        // 1. Pegada de Gato ao Clicar (Efeito Original)
+        document.addEventListener('click', (e) => {
+          if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+
+          const paw = document.createElement('div');
+          paw.className = 'paw-print';
+          paw.innerText = '🐾';
+          paw.style.left = (e.pageX - 12) + 'px';
+          paw.style.top = (e.pageY - 12) + 'px';
+          document.body.appendChild(paw);
+          setTimeout(() => paw.remove(), 1000);
         });
 
         // 2. Troca de Abas
