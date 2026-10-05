@@ -55,7 +55,7 @@ app.get('/', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>MeowNitor Interativo Deluxe 🐾</title>
+      <title>MeowNitor Supremo 🐾</title>
       <style>
         * {
           box-sizing: border-box;
@@ -78,13 +78,13 @@ app.get('/', (req, res) => {
           overflow-x: hidden;
         }
 
-        /* Bolinha de Lã que segue o mouse */
-        #yarnBall {
+        /* Patinha que segue o cursor */
+        #pawCursor {
           position: fixed;
-          font-size: 26px;
+          font-size: 22px;
           pointer-events: none;
           z-index: 9999;
-          transition: transform 0.15s ease-out;
+          transition: transform 0.08s ease-out;
         }
 
         .container {
@@ -147,10 +147,44 @@ app.get('/', (req, res) => {
           50% { opacity: 0.3; }
         }
 
-        .interactive-bar {
+        /* Sistema de Abas */
+        .tab-bar {
           display: flex;
           gap: 10px;
           margin-bottom: 20px;
+          border-bottom: 1px solid #3d312e;
+          padding-bottom: 10px;
+        }
+
+        .tab-btn {
+          background: transparent;
+          color: #a3908c;
+          border: none;
+          font-size: 1rem;
+          font-weight: 700;
+          padding: 8px 16px;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+          background: #FFBFB3;
+          color: #181414;
+        }
+
+        .tab-content {
+          display: none;
+        }
+
+        .tab-content.active {
+          display: block;
+        }
+
+        .interactive-bar {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 16px;
           flex-wrap: wrap;
         }
 
@@ -175,7 +209,18 @@ app.get('/', (req, res) => {
           transform: scale(1.05);
         }
 
-        /* Caixa de Miau-Tradução */
+        /* Caixa de Curiosidades Felinas */
+        .fact-box {
+          background: #2a2321;
+          border-left: 4px solid #FFBFB3;
+          padding: 14px 18px;
+          border-radius: 12px;
+          margin-bottom: 20px;
+          font-size: 0.95rem;
+          color: #ffdcd5;
+        }
+
+        /* Miau-Tradutor */
         .translator-box {
           background: #2a2321;
           border: 1px solid #3d312e;
@@ -206,6 +251,38 @@ app.get('/', (req, res) => {
           color: #FFBFB3;
           font-weight: bold;
           font-size: 1rem;
+        }
+
+        /* Área do Novelo de Lã */
+        .yarn-playground {
+          background: #2a2321;
+          border: 2px dashed #FFBFB3;
+          border-radius: 20px;
+          padding: 40px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 20px;
+          position: relative;
+          min-height: 250px;
+          justify-content: center;
+        }
+
+        .yarn-ball-big {
+          font-size: 80px;
+          cursor: pointer;
+          user-select: none;
+          transition: transform 0.2s ease;
+          display: inline-block;
+        }
+
+        .yarn-ball-big:hover {
+          transform: scale(1.15) rotate(15deg);
+        }
+
+        .yarn-ball-big:active {
+          transform: scale(0.95) rotate(-15deg);
         }
 
         .section-title {
@@ -280,7 +357,7 @@ app.get('/', (req, res) => {
           transition: width 0.5s ease-in-out;
         }
 
-        /* Animações de Petiscos caindo */
+        /* Chuva de Petiscos */
         .treat-rain {
           position: fixed;
           top: -30px;
@@ -295,7 +372,7 @@ app.get('/', (req, res) => {
           100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
         }
 
-        /* Visual da Caixa de Papelão */
+        /* Caixa de Papelão */
         .box-mode {
           background: #3b2c21 !important;
           border: 4px dashed #8b5a2b !important;
@@ -312,108 +389,173 @@ app.get('/', (req, res) => {
       </style>
     </head>
     <body>
-      <div id="yarnBall">🧶</div>
+      <div id="pawCursor">🐾</div>
 
       <div class="container" id="mainContainer">
         <header>
-          <h1>🐱 MeowNitor Deluxe</h1>
+          <h1>🐱 MeowNitor Supremo</h1>
           <span style="color: #FFBFB3; font-weight: 700; font-size: 0.9rem;">
             <span class="live-dot"></span> Toca Ativa
           </span>
         </header>
 
-        <!-- Barra de Brinquedos Felinos -->
+        <!-- Navegação por Abas -->
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Painel do Servidor</button>
+          <button class="tab-btn" onclick="switchTab('yarn')">🧶 Brincar com Novelo</button>
+        </div>
+
+        <!-- Barra de Interações -->
         <div class="interactive-bar">
           <button class="btn-cat" onclick="playMeow()">🔊 Pedir Miau</button>
-          <button class="btn-cat" onclick="togglePurr()" id="purrBtn">💤 Activar Purr (Ronronar)</button>
+          <button class="btn-cat" onclick="newFact()">💡 Fato Felino</button>
+          <button class="btn-cat" onclick="togglePurr()" id="purrBtn">💤 Activar Purr</button>
           <button class="btn-cat" onclick="feedCat()">🐟 Dar Petisco</button>
           <button class="btn-cat" onclick="boxMode()">📦 Entrar na Caixa</button>
         </div>
 
-        <!-- Miau-Tradutor -->
-        <div class="translator-box">
-          <label style="font-size: 0.85rem; color: #FFBFB3; font-weight: 700;">🗣️ Miau-Tradutor Humano ➔ Felino:</label>
-          <input type="text" id="humanInput" placeholder="Digite algo para o gato entender..." oninput="translateToMeow()">
-          <div class="translated-result" id="meowResult">Miau? 🐱</div>
+        <!-- Curiosidades Felinas -->
+        <div class="fact-box" id="factBox">
+          🐾 <strong>Fato Felino:</strong> Gatos passam cerca de 70% da vida dormindo!
         </div>
 
-        <div id="monitorContent">
-          <div class="section-title">🥣 Apetite e Ronronar do Sistema</div>
-          <div class="grid">
-            <div class="card full-width">
-              <span class="label">🐟 Pote de Ração (Memória RAM)</span>
-              <span class="value highlight" id="ramText">${usedMem} MB / ${totalMem} MB (${memUsagePercent}%)</span>
-              <div class="progress-bar">
-                <div class="progress-fill" id="ramBar" style="width: ${memUsagePercent}%;"></div>
+        <!-- ABA 1: Painel do Servidor -->
+        <div id="dashboardTab" class="tab-content active">
+          <!-- Miau-Tradutor -->
+          <div class="translator-box">
+            <label style="font-size: 0.85rem; color: #FFBFB3; font-weight: 700;">🗣️ Miau-Tradutor Humano ➔ Felino:</label>
+            <input type="text" id="humanInput" placeholder="Digite algo para o gato entender..." oninput="translateToMeow()">
+            <div class="translated-result" id="meowResult">Miau? 🐱</div>
+          </div>
+
+          <div id="monitorContent">
+            <div class="section-title">🥣 Apetite e Ronronar do Sistema</div>
+            <div class="grid">
+              <div class="card full-width">
+                <span class="label">🐟 Pote de Ração (Memória RAM)</span>
+                <span class="value highlight" id="ramText">${usedMem} MB / ${totalMem} MB (${memUsagePercent}%)</span>
+                <div class="progress-bar">
+                  <div class="progress-fill" id="ramBar" style="width: ${memUsagePercent}%;"></div>
+                </div>
+              </div>
+
+              <div class="card">
+                <span class="label">Petisco Atual (RAM Node)</span>
+                <span class="value highlight" id="processMem">${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB</span>
+              </div>
+
+              <div class="card">
+                <span class="label">Nível de Agitação (CPU)</span>
+                <span class="value highlight" id="loadAvg">${os.loadavg()[0].toFixed(2)}</span>
+              </div>
+
+              <div class="card">
+                <span class="label">Tempo Acordado</span>
+                <span class="value" id="uptime">${formatUptime(os.uptime())}</span>
               </div>
             </div>
 
-            <div class="card">
-              <span class="label">Petisco Atual (RAM Node)</span>
-              <span class="value highlight" id="processMem">${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB</span>
+            <div class="section-title">🧠 Cérebro e Músculos Felinos</div>
+            <div class="grid">
+              <div class="card full-width">
+                <span class="label">Modelo do Cérebro</span>
+                <span class="value">${cpus[0] ? cpus[0].model : 'Gato Misterioso'}</span>
+              </div>
+
+              <div class="card">
+                <span class="label">Patas e Garras</span>
+                <span class="value">${cpus.length} Núcleos</span>
+              </div>
+
+              <div class="card">
+                <span class="label">Frequência</span>
+                <span class="value">${cpus[0] ? cpus[0].speed : 'N/A'} MHz</span>
+              </div>
             </div>
 
-            <div class="card">
-              <span class="label">Nível de Agitação (CPU)</span>
-              <span class="value highlight" id="loadAvg">${os.loadavg()[0].toFixed(2)}</span>
-            </div>
+            <div class="section-title">🏠 Território Felino</div>
+            <div class="grid">
+              <div class="card">
+                <span class="label">Nome da Toca</span>
+                <span class="value highlight">${os.hostname()}</span>
+              </div>
 
-            <div class="card">
-              <span class="label">Tempo Acordado</span>
-              <span class="value" id="uptime">${formatUptime(os.uptime())}</span>
+              <div class="card">
+                <span class="label">IP Local</span>
+                <span class="value">${getLocalIP()}</span>
+              </div>
+
+              <div class="card">
+                <span class="label">Humano de Estimação</span>
+                <span class="value">${os.userInfo().username}</span>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div class="section-title">🧠 Cérebro e Músculos Felinos</div>
-          <div class="grid">
-            <div class="card full-width">
-              <span class="label">Modelo do Cérebro</span>
-              <span class="value">${cpus[0] ? cpus[0].model : 'Gato Misterioso'}</span>
-            </div>
-
-            <div class="card">
-              <span class="label">Patas e Garras</span>
-              <span class="value">${cpus.length} Núcleos</span>
-            </div>
-
-            <div class="card">
-              <span class="label">Frequência</span>
-              <span class="value">${cpus[0] ? cpus[0].speed : 'N/A'} MHz</span>
-            </div>
-          </div>
-
-          <div class="section-title">🏠 Território Felino</div>
-          <div class="grid">
-            <div class="card">
-              <span class="label">Nome da Toca</span>
-              <span class="value highlight">${os.hostname()}</span>
-            </div>
-
-            <div class="card">
-              <span class="label">IP Local</span>
-              <span class="value">${getLocalIP()}</span>
-            </div>
-
-            <div class="card">
-              <span class="label">Humano de Estimação</span>
-              <span class="value">${os.userInfo().username}</span>
+        <!-- ABA 2: Playground do Novelo de Lã -->
+        <div id="yarnTab" class="tab-content">
+          <div class="yarn-playground">
+            <h2 style="color: #FFBFB3;">🧶 Cantinho do Novelo</h2>
+            <p style="color: #ffdcd5;">Clique no novelo para dar patadas e fazê-lo rolar!</p>
+            <div class="yarn-ball-big" id="yarnBig" onclick="rollYarn()">🧶</div>
+            <div style="font-weight: 700; color: #FFBFB3; font-size: 1.1rem;">
+              Patadas Dadas: <span id="yarnClicks">0</span> 🐾
             </div>
           </div>
         </div>
 
         <footer>
-          <p>Feito com 🐾 | Brinque com a bolinha de lã! 🧶</p>
+          <p>Feito com 🐾 | Mova o mouse para passear com a patinha!</p>
         </footer>
       </div>
 
       <script>
-        // 1. Bolinha de Lã Perguidora
-        const yarn = document.getElementById('yarnBall');
+        // 1. Patinha que segue o cursor do mouse
+        const paw = document.getElementById('pawCursor');
         document.addEventListener('mousemove', (e) => {
-          yarn.style.transform = \`translate(\${e.clientX + 10}px, \${e.clientY + 10}px)\`;
+          paw.style.transform = \`translate(\${e.clientX + 12}px, \${e.clientY + 12}px)\`;
         });
 
-        // 2. Chuva de Petiscos (Alimentar Gato)
+        // 2. Troca de Abas
+        function switchTab(tab) {
+          document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+          if(tab === 'dashboard') {
+            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            document.getElementById('dashboardTab').classList.add('active');
+          } else {
+            document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            document.getElementById('yarnTab').classList.add('active');
+          }
+        }
+
+        // 3. Brincadeira do Novelo de Lã
+        let yarnCount = 0;
+        function rollYarn() {
+          yarnCount++;
+          document.getElementById('yarnClicks').innerText = yarnCount;
+          playMeow();
+        }
+
+        // 4. Curiosidades Felinas
+        const catFacts = [
+          "Gatos passam cerca de 70% da vida dormindo!",
+          "O miado foi desenvolvido quase exclusivamente para se comunicar com humanos.",
+          "Um gato pode pular até 6 vezes a sua própria altura!",
+          "O nariz de cada gato tem uma textura única, assim como a digital humana.",
+          "Gatos têm 32 músculos em cada orelha para ouvir tudo em 360 graus.",
+          "Gatos não conseguem sentir o gosto de coisas doces!",
+          "O ronronar de um gato pode ter frequências que ajudam na regeneração óssea."
+        ];
+
+        function newFact() {
+          const randomFact = catFacts[Math.floor(Math.random() * catFacts.length)];
+          document.getElementById('factBox').innerHTML = '🐾 <strong>Fato Felino:</strong> ' + randomFact;
+        }
+
+        // 5. Chuva de Petiscos
         function feedCat() {
           const treats = ['🐟', '🐠', '🦐', '🥩', '🥛'];
           for(let i = 0; i < 20; i++) {
@@ -428,7 +570,7 @@ app.get('/', (req, res) => {
           }
         }
 
-        // 3. Miau-Tradutor
+        // 6. Miau-Tradutor
         function translateToMeow() {
           const text = document.getElementById('humanInput').value.trim();
           if(!text) {
@@ -441,7 +583,7 @@ app.get('/', (req, res) => {
           document.getElementById('meowResult').innerText = translated + ' 🐱🐾';
         }
 
-        // 4. Som Continuo de Ronronar (Audio Context Purr)
+        // 7. Som Contínuo de Ronronar (Purr)
         let purrCtx = null;
         let isPurring = false;
         function togglePurr() {
@@ -452,7 +594,7 @@ app.get('/', (req, res) => {
             const gain = purrCtx.createGain();
             
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(28, purrCtx.currentTime); // Frequência baixa de ronronar
+            osc.frequency.setValueAtTime(28, purrCtx.currentTime);
             
             gain.gain.setValueAtTime(0.08, purrCtx.currentTime);
             
@@ -460,20 +602,20 @@ app.get('/', (req, res) => {
             gain.connect(purrCtx.destination);
             osc.start();
             
-            btn.innerText = "🔊 Parar Ronronar";
+            btn.innerText = "🔊 Parar Purr";
             btn.style.backgroundColor = "#FFBFB3";
             btn.style.color = "#181414";
             isPurring = true;
           } else {
             if(purrCtx) purrCtx.close();
-            btn.innerText = "💤 Activar Purr (Ronronar)";
+            btn.innerText = "💤 Activar Purr";
             btn.style.backgroundColor = "#2a2321";
             btn.style.color = "#FFBFB3";
             isPurring = false;
           }
         }
 
-        // 5. Entrar na Caixa
+        // 8. Entrar na Caixa
         let inBox = false;
         function boxMode() {
           const container = document.getElementById('mainContainer');
@@ -487,7 +629,8 @@ app.get('/', (req, res) => {
             boxDiv.innerHTML = '<h2 style="color: #FFBFB3;">📦 Se eu quibo, eu sento!</h2><p style="margin-top:10px;">O gato se escondeu confortavelmente na caixa de papelão.</p>';
             container.appendChild(boxDiv);
           } else {
-            document.getElementById('boxText').remove();
+            const boxDiv = document.getElementById('boxText');
+            if(boxDiv) boxDiv.remove();
             container.classList.remove('box-mode');
             content.style.display = 'block';
           }
@@ -516,7 +659,7 @@ app.get('/', (req, res) => {
           osc.stop(ctx.currentTime + 0.4);
         }
 
-        // Atualização dos dados em tempo real
+        // Atualização em tempo real
         async function updateStats() {
           if(inBox) return;
           try {
@@ -541,4 +684,4 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor felino deluxe rodando na porta ${PORT} 🐱`));
+app.listen(PORT, () => console.log(`Servidor felino rodando na porta ${PORT} 🐱`));
