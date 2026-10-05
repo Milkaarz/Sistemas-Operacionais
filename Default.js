@@ -4,21 +4,51 @@ const os = require('os');
 const app = express();
 
 function formatUptime(seconds) {
-  const hours = Math.floor(seconds / 3600);
+  const days = Math.floor(seconds / (3600 * 24));
+  const hours = Math.floor((seconds % (3600 * 24)) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  return `${hours}h ${minutes}m`;
+  const secs = Math.floor(seconds % 60);
+  return `${days > 0 ? days + 'd ' : ''}${hours}h ${minutes}m ${secs}s`;
 }
 
-app.get('/', (req, res) => {
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+
+// Rota de API JSON para atualização em tempo real
+app.get('/api/stats', (req, res) => {
   const totalMem = Math.round(os.totalmem() / 1024 / 1024);
   const freeMem = Math.round(os.freemem() / 1024 / 1024);
   const usedMem = totalMem - freeMem;
   const memUsagePercent = Math.round((usedMem / totalMem) * 100);
-  
-  const cpuModel = os.cpus()[0] ? os.cpus()[0].model : 'N/A';
-  const userInfo = os.userInfo().username;
-  const homeDir = os.homedir();
-  const networkInterfaces = Object.keys(os.networkInterfaces()).length;
+  const processMem = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
+
+  res.json({
+    uptime: formatUptime(os.uptime()),
+    loadAvg: os.loadavg()[0].toFixed(2),
+    usedMem,
+    freeMem,
+    totalMem,
+    memUsagePercent,
+    processMem
+  });
+});
+
+app.get('/', (req, res) => {
+  const cpus = os.cpus();
+  const totalMem = Math.round(os.totalmem() / 1024 / 1024);
+  const freeMem = Math.round(os.freemem() / 1024 / 1024);
+  const usedMem = totalMem - freeMem;
+  const memUsagePercent = Math.round((usedMem / totalMem) * 100);
+  const bootTime = new Date(Date.now() - os.uptime() * 1000).toLocaleString('pt-BR');
 
   res.send(`
     <!DOCTYPE html>
@@ -26,7 +56,7 @@ app.get('/', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>MeowNitor de Sistema 🐾</title>
+      <title>MeowNitor Ultra 🐾</title>
       <style>
         * {
           box-sizing: border-box;
@@ -49,7 +79,7 @@ app.get('/', (req, res) => {
 
         .container {
           width: 100%;
-          max-width: 900px;
+          max-width: 950px;
           background: #211c1b;
           border-radius: 28px;
           padding: 36px;
@@ -58,7 +88,6 @@ app.get('/', (req, res) => {
           position: relative;
         }
 
-        /* Orelhas de Gato no topo do container */
         .container::before, .container::after {
           content: '';
           position: absolute;
@@ -73,9 +102,9 @@ app.get('/', (req, res) => {
         .container::after { right: 40px; }
 
         header {
-          margin-bottom: 32px;
+          margin-bottom: 24px;
           border-bottom: 2px dashed #3a2e2b;
-          padding-bottom: 20px;
+          padding-bottom: 18px;
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -92,6 +121,21 @@ app.get('/', (req, res) => {
           gap: 10px;
         }
 
+        .live-dot {
+          display: inline-block;
+          width: 10px;
+          height: 10px;
+          background-color: #FFBFB3;
+          border-radius: 50%;
+          box-shadow: 0 0 10px #FFBFB3;
+          animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+
         header .status-badge {
           background-color: rgba(255, 191, 179, 0.12);
           color: #FFBFB3;
@@ -102,23 +146,34 @@ app.get('/', (req, res) => {
           font-weight: 700;
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
+        }
+
+        .section-title {
+          color: #FFBFB3;
+          font-size: 1.1rem;
+          margin: 20px 0 12px 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border-left: 4px solid #FFBFB3;
+          padding-left: 10px;
         }
 
         .grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 20px;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 16px;
         }
 
         .card {
           background: #2a2321;
-          padding: 22px;
-          border-radius: 20px;
+          padding: 18px;
+          border-radius: 18px;
           border: 1px solid #3d312e;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 6px;
           transition: transform 0.2s ease, border-color 0.2s ease;
         }
 
@@ -128,18 +183,15 @@ app.get('/', (req, res) => {
         }
 
         .card .label {
-          font-size: 0.85rem;
+          font-size: 0.8rem;
           text-transform: uppercase;
           letter-spacing: 0.05em;
           color: #d1beba;
           font-weight: 700;
-          display: flex;
-          align-items: center;
-          gap: 6px;
         }
 
         .card .value {
-          font-size: 1.3rem;
+          font-size: 1.2rem;
           font-weight: 700;
           color: #ffffff;
           word-break: break-word;
@@ -153,57 +205,83 @@ app.get('/', (req, res) => {
           grid-column: 1 / -1;
         }
 
-        .progress-container {
-          position: relative;
-          margin-top: 12px;
-        }
-
         .progress-bar {
           width: 100%;
-          height: 14px;
+          height: 12px;
           background-color: #3d312e;
           border-radius: 999px;
           overflow: hidden;
+          margin-top: 8px;
         }
 
         .progress-fill {
           height: 100%;
           background: linear-gradient(90deg, #FFBFB3, #ffdcd5);
           border-radius: 999px;
-          transition: width 0.4s ease;
+          transition: width 0.5s ease-in-out;
         }
 
         footer {
-          margin-top: 28px;
+          margin-top: 30px;
           text-align: center;
           color: #a3908c;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
         }
       </style>
     </head>
     <body>
       <div class="container">
         <header>
-          <h1>🐱 MeowNitor de Sistema</h1>
-          <span class="status-badge"><span>🐾</span> Ronronando Perfeitamente</span>
+          <h1>🐱 MeowNitor Ultra</h1>
+          <span class="status-badge"><span class="live-dot"></span> Ao Vivo (Auto 3s)</span>
         </header>
 
+        <div class="section-title">⚡ Desempenho e Memória</div>
         <div class="grid">
-          <!-- Servidor e Usuário -->
-          <div class="card">
-            <span class="label">🏠 Hostname</span>
-            <span class="value highlight">${os.hostname()}</span>
+          <div class="card full-width">
+            <span class="label">🥣 Consumo de Memória RAM</span>
+            <span class="value highlight" id="ramText">${usedMem} MB / ${totalMem} MB (${memUsagePercent}%)</span>
+            <div class="progress-bar">
+              <div class="progress-fill" id="ramBar" style="width: ${memUsagePercent}%;"></div>
+            </div>
           </div>
 
           <div class="card">
-            <span class="label">👤 Humano Responsável</span>
-            <span class="value">${userInfo}</span>
+            <span class="label">📊 Uso da Aplicação (Process Heap)</span>
+            <span class="value highlight" id="processMem">${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB</span>
           </div>
 
-          <!-- Sistema e Arquitetura -->
           <div class="card">
-            <span class="label">💻 Sistema Operacional</span>
-            <span class="value">${os.platform()} (${os.type()})</span>
+            <span class="label">⚡ Carga Média CPU (1m)</span>
+            <span class="value highlight" id="loadAvg">${os.loadavg()[0].toFixed(2)}</span>
+          </div>
+
+          <div class="card">
+            <span class="label">⏰ Uptime do Sistema</span>
+            <span class="value" id="uptime">${formatUptime(os.uptime())}</span>
+          </div>
+
+          <div class="card">
+            <span class="label">🚀 LIGADO DESDE</span>
+            <span class="value" style="font-size: 0.9rem;">${bootTime}</span>
+          </div>
+        </div>
+
+        <div class="section-title">🧠 Especificações do Hardware</div>
+        <div class="grid">
+          <div class="card full-width">
+            <span class="label">🐟 Modelo da CPU</span>
+            <span class="value">${cpus[0] ? cpus[0].model : 'N/A'}</span>
+          </div>
+
+          <div class="card">
+            <span class="label">🐾 Núcleos / Threads</span>
+            <span class="value">${cpus.length} Núcleos</span>
+          </div>
+
+          <div class="card">
+            <span class="label">💨 Frequência Base</span>
+            <span class="value">${cpus[0] ? cpus[0].speed : 'N/A'} MHz</span>
           </div>
 
           <div class="card">
@@ -211,49 +289,78 @@ app.get('/', (req, res) => {
             <span class="value">${os.arch()}</span>
           </div>
 
-          <!-- Processador -->
-          <div class="card full-width">
-            <span class="label">🐟 Cérebro do Gato (CPU)</span>
-            <span class="value">${cpuModel} (${os.cpus().length} Núcleos)</span>
-          </div>
-
-          <!-- Tempo Ativo e Rede -->
           <div class="card">
-            <span class="label">⏰ Tempo Sem Sesta (Uptime)</span>
-            <span class="value">${formatUptime(os.uptime())}</span>
+            <span class="label">Endianness</span>
+            <span class="value">${os.endianness()}</span>
+          </div>
+        </div>
+
+        <div class="section-title">🌐 Sistema e Rede</div>
+        <div class="grid">
+          <div class="card">
+            <span class="label">🏠 Hostname</span>
+            <span class="value highlight">${os.hostname()}</span>
           </div>
 
           <div class="card">
-            <span class="label">🌐 Antenas de Rede</span>
-            <span class="value">${networkInterfaces} Conexões</span>
+            <span class="label">🌐 IP Local (IPv4)</span>
+            <span class="value">${getLocalIP()}</span>
           </div>
 
-          <!-- Diretório Root -->
-          <div class="card full-width">
-            <span class="label">📦 Toca Principal (Home)</span>
-            <span class="value" style="font-size: 1rem; font-family: monospace; color: #ffdcd5;">${homeDir}</span>
+          <div class="card">
+            <span class="label">👤 Usuário</span>
+            <span class="value">${os.userInfo().username}</span>
           </div>
 
-          <!-- Uso de Memória -->
-          <div class="card full-width">
-            <span class="label">🥣 Pote de Ração (Memória RAM)</span>
-            <span class="value highlight">${usedMem} MB <span style="color: #ffffff; font-size: 1rem;">/ ${totalMem} MB (${memUsagePercent}% consumido)</span></span>
-            <div class="progress-container">
-              <div class="progress-bar">
-                <div class="progress-fill" style="width: ${memUsagePercent}%;"></div>
-              </div>
-            </div>
+          <div class="card">
+            <span class="label">💻 Sistema Operacional</span>
+            <span class="value">${os.platform()} (${os.type()})</span>
+          </div>
+
+          <div class="card">
+            <span class="label">🐧 Versão Kernel</span>
+            <span class="value" style="font-size: 0.95rem;">${os.release()}</span>
+          </div>
+
+          <div class="card">
+            <span class="label">🟢 Node.js</span>
+            <span class="value highlight">${process.version}</span>
+          </div>
+
+          <div class="card">
+            <span class="label">🆔 Process ID (PID)</span>
+            <span class="value">${process.pid}</span>
           </div>
         </div>
 
         <footer>
-          <p>Feito com 🐾 para amantes de felinos e servidores!</p>
+          <p>Feito com 🐾 | Atualizando em tempo real a cada 3 segundos</p>
         </footer>
       </div>
+
+      <script>
+        // Script client-side para recarregar informações sem F5
+        async function updateStats() {
+          try {
+            const res = await fetch('/api/stats');
+            const data = await res.json();
+            
+            document.getElementById('ramText').innerText = \`\${data.usedMem} MB / \${data.totalMem} MB (\${data.memUsagePercent}%)\`;
+            document.getElementById('ramBar').style.width = \`\${data.memUsagePercent}%\`;
+            document.getElementById('processMem').innerText = \`\${data.processMem} MB\`;
+            document.getElementById('loadAvg').innerText = data.loadAvg;
+            document.getElementById('uptime').innerText = data.uptime;
+          } catch (e) {
+            console.error('Erro ao atualizar dados:', e);
+          }
+        }
+
+        setInterval(updateStats, 3000);
+      </script>
     </body>
     </html>
   `);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor felino rodando na porta ${PORT} 🐱`));
+app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT} 🐱`));
