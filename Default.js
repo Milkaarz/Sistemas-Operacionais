@@ -47,7 +47,6 @@ app.get('/', (req, res) => {
   const freeMem = Math.round(os.freemem() / 1024 / 1024);
   const usedMem = totalMem - freeMem;
   const memUsagePercent = Math.round((usedMem / totalMem) * 100);
-  const bootTime = new Date(Date.now() - os.uptime() * 1000).toLocaleString('pt-BR');
 
   res.send(`
     <!DOCTYPE html>
@@ -444,7 +443,7 @@ app.get('/', (req, res) => {
 
               <div class="card">
                 <span class="label">Petisco Atual (RAM Node)</span>
-                <span class="value highlight" id="processMem">${(processMemoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB</span>
+                <span class="value highlight" id="processMem">${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB</span>
               </div>
 
               <div class="card">
