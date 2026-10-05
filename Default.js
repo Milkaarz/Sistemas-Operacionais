@@ -4,7 +4,7 @@ const os = require('os');
 const app = express();
 
 app.get('/', (req, res) => {
-  res.send(
+  res.send(`
     <h1>Monitor de Sistemas Operacionais</h1>
     <p><strong>Hostname:</strong> ${os.hostname()}</p>
     <p><strong>Plataforma:</strong> ${os.platform()}</p>
@@ -13,7 +13,7 @@ app.get('/', (req, res) => {
     <p><strong>Memória Livre:</strong> ${Math.round(os.freemem()/1024/1024)} MB</p>
     <p><strong>CPUs:</strong> ${os.cpus().length}</p>
     <p><strong>Uptime:</strong> ${Math.round(os.uptime()/60)} minutos</p>
-  );
+  `);
 });
 
 const PORT = process.env.PORT || 3000;
