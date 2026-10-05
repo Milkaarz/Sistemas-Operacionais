@@ -2,6 +2,7 @@
 
 O **MeowNitor Perfeito** é um painel de monitoramento de servidor (*dashboard*) interativo em tempo real que transforma métricas técnicas do sistema em uma interface temática e divertida sobre **gatos**.
 
+Acesse em: https://sistemas-operacionais-pfph.onrender.com/#s-gauges
 ---
 
 ## 📊 1. Painel de Monitoramento (Métricas do Servidor)
